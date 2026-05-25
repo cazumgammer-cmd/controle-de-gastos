@@ -6,6 +6,10 @@
 <title>Controle de Gastos</title>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js"></script>
+
 <style>
   :root {
     --bg: #f5f4f0;
@@ -41,18 +45,40 @@
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
   
+  /* AUTH SCREEN */
+  .auth-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: var(--bg); padding: 1rem; }
+  .auth-box { background: var(--surface); border-radius: var(--radius-lg); padding: 2rem; max-width: 400px; width: 100%; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+  .auth-header { text-align: center; margin-bottom: 2rem; }
+  .auth-header i { font-size: 48px; color: var(--green); display: block; margin-bottom: 1rem; }
+  .auth-header h1 { font-size: 24px; margin-bottom: 0.5rem; }
+  .auth-header p { color: var(--text2); font-size: 14px; }
+  .auth-form { display: flex; flex-direction: column; gap: 12px; }
+  .auth-input { height: 40px; padding: 0 12px; border: 0.5px solid var(--border2); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: 14px; font-family: var(--font); outline: none; }
+  .auth-input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(29,158,117,0.12); }
+  .auth-btn { height: 40px; background: var(--green); border: none; border-radius: var(--radius); cursor: pointer; font-size: 14px; color: #fff; font-weight: 500; transition: background 0.15s; }
+  .auth-btn:hover { background: var(--green-dark); }
+  .auth-toggle { text-align: center; margin-top: 1rem; font-size: 13px; color: var(--text2); }
+  .auth-toggle a { color: var(--green); cursor: pointer; text-decoration: none; }
+  .auth-error { background: var(--red-bg); border: 0.5px solid var(--red); color: var(--red-dark); padding: 10px 12px; border-radius: var(--radius); font-size: 13px; margin-bottom: 12px; }
+  .auth-loading { opacity: 0.6; cursor: not-allowed; }
+
   /* HEADER */
   .topbar { background: var(--surface); border-bottom: 0.5px solid var(--border); padding: 0 1.5rem; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
   .topbar-brand { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; }
   .topbar-brand i { font-size: 22px; color: var(--green); }
+  .topbar-right { display: flex; align-items: center; gap: 15px; }
+  .user-info { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .user-avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--green); color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 600; }
   .month-nav { display: flex; align-items: center; gap: 8px; }
   .month-nav button { background: none; border: 0.5px solid var(--border2); border-radius: 8px; width: 30px; height: 30px; cursor: pointer; color: var(--text2); font-size: 16px; display: flex; align-items: center; justify-content: center; }
   .month-nav button:hover { background: var(--surface2); }
   .month-nav span { font-size: 14px; font-weight: 500; min-width: 130px; text-align: center; }
+  .btn-logout { height: 32px; padding: 0 12px; background: var(--red-bg); border: 0.5px solid var(--red); border-radius: var(--radius); cursor: pointer; color: var(--red-dark); font-size: 12px; font-weight: 500; }
+  .btn-logout:hover { background: var(--red); color: #fff; }
 
   /* LAYOUT */
   .layout { display: grid; grid-template-columns: 340px 1fr; gap: 0; min-height: calc(100vh - 56px); }
-  .sidebar { background: var(--surface); border-right: 0.5px solid var(--border); padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; }
+  .sidebar { background: var(--surface); border-right: 0.5px solid var(--border); padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; overflow-y: auto; }
   .main { padding: 1.5rem; display: flex; flex-direction: column; gap: 1.5rem; overflow-y: auto; }
 
   /* CARDS */
@@ -133,187 +159,236 @@
     .sidebar { border-right: none; border-bottom: 0.5px solid var(--border); }
     .cards { grid-template-columns: 1fr 1fr; }
     .cards .card.saldo { grid-column: span 2; }
+    .topbar-right { flex-direction: column; gap: 10px; }
   }
 </style>
 </head>
 <body>
 
-<header class="topbar">
-  <div class="topbar-brand">
-    <i class="ti ti-wallet"></i>
-    Controle de Gastos
+<!-- AUTH SCREEN -->
+<div id="authScreen" class="auth-container">
+  <div class="auth-box">
+    <div class="auth-header">
+      <i class="ti ti-wallet"></i>
+      <h1>Controle de Gastos</h1>
+      <p id="authTitle">Faça login para continuar</p>
+    </div>
+    <div id="authError" class="auth-error" style="display:none;"></div>
+    <div class="auth-form">
+      <input type="email" id="authEmail" class="auth-input" placeholder="Email" />
+      <input type="password" id="authPassword" class="auth-input" placeholder="Senha" />
+      <button id="authBtn" class="auth-btn" onclick="handleAuth()">Entrar</button>
+    </div>
+    <div class="auth-toggle">
+      Não tem conta? <a onclick="toggleAuthMode()">Registre-se</a>
+    </div>
   </div>
-  <div class="month-nav">
-    <button onclick="mudarMes(-1)" title="Mês anterior"><i class="ti ti-chevron-left"></i></button>
-    <span id="mesAtual"></span>
-    <button onclick="mudarMes(1)" title="Próximo mês"><i class="ti ti-chevron-right"></i></button>
+</div>
+
+<!-- APP SCREEN -->
+<div id="appScreen" style="display:none;">
+  <header class="topbar">
+    <div class="topbar-brand">
+      <i class="ti ti-wallet"></i>
+      Controle de Gastos
+    </div>
+    <div style="flex:1;"></div>
+    <div class="month-nav">
+      <button onclick="mudarMes(-1)" title="Mês anterior"><i class="ti ti-chevron-left"></i></button>
+      <span id="mesAtual"></span>
+      <button onclick="mudarMes(1)" title="Próximo mês"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div class="topbar-right">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">U</div>
+        <div>
+          <div style="font-size:12px; color:var(--text2);">Logado como</div>
+          <div id="userEmail" style="font-weight:500;"></div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- SIDEBAR: FORMULÁRIO -->
+    <aside class="sidebar">
+      <div>
+        <div class="sec-title">Novo lançamento</div>
+        <div class="tipo-toggle">
+          <button class="tipo-btn despesa active" id="btnDespesa" onclick="setTipo('despesa')">
+            <i class="ti ti-minus"></i> Despesa
+          </button>
+          <button class="tipo-btn receita" id="btnReceita" onclick="setTipo('receita')">
+            <i class="ti ti-plus"></i> Receita
+          </button>
+        </div>
+        <div class="form-group">
+          <label>Descrição</label>
+          <input type="text" id="inputDesc" placeholder="Ex: Aluguel, Salário..." />
+        </div>
+        <div class="form-row two">
+          <div class="form-group">
+            <label>Valor (R$)</label>
+            <input type="number" id="inputValor" placeholder="0,00" min="0" step="0.01" />
+          </div>
+          <div class="form-group">
+            <label>Data</label>
+            <input type="date" id="inputData" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Categoria</label>
+          <select id="inputCat"></select>
+        </div>
+        <div class="form-group">
+          <label>Forma de pagamento</label>
+          <select id="inputPag">
+            <option value="Dinheiro">💵 Dinheiro</option>
+            <option value="Débito">💳 Débito</option>
+            <option value="Crédito">💳 Crédito</option>
+            <option value="Pix">⚡ Pix</option>
+            <option value="Transferência">🏦 Transferência</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Observação (opcional)</label>
+          <input type="text" id="inputObs" placeholder="Parcela 1/3, recorrente..." />
+        </div>
+        <button class="btn-add" onclick="adicionarLancamento()">
+          <i class="ti ti-plus"></i> Adicionar lançamento
+        </button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <!-- CARDS RESUMO -->
+      <div class="cards">
+        <div class="card receita">
+          <div class="label"><i class="ti ti-trending-up"></i> Receitas</div>
+          <div class="value" id="totalReceita">R$ 0,00</div>
+        </div>
+        <div class="card despesa">
+          <div class="label"><i class="ti ti-trending-down"></i> Despesas</div>
+          <div class="value" id="totalDespesa">R$ 0,00</div>
+        </div>
+        <div class="card saldo">
+          <div class="label"><i class="ti ti-scale"></i> Saldo</div>
+          <div class="value" id="totalSaldo" style="color:var(--text)">R$ 0,00</div>
+        </div>
+      </div>
+
+      <!-- BARRA ORÇAMENTO -->
+      <div class="orcamento-box" id="orcBox" style="display:none">
+        <div class="row">
+          <span style="color:var(--text2); font-size:13px">Comprometimento da renda</span>
+          <strong id="orcPct">0%</strong>
+        </div>
+        <div class="bar-wrap">
+          <div class="bar-fill" id="orcBar" style="width:0%"></div>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div>
+        <div class="tabs" style="margin-bottom:14px;">
+          <button class="tab active" id="tabLancamentos" onclick="setTab('lancamentos')">
+            <i class="ti ti-list"></i> Lançamentos
+          </button>
+          <button class="tab" id="tabGraficos" onclick="setTab('graficos')">
+            <i class="ti ti-chart-pie"></i> Gráficos
+          </button>
+          <button class="tab" id="tabCategorias" onclick="setTab('categorias')">
+            <i class="ti ti-category"></i> Categorias
+          </button>
+        </div>
+
+        <!-- VIEW: LANÇAMENTOS -->
+        <div id="viewLancamentos">
+          <div class="filter-row" style="margin-bottom:12px;">
+            <select id="filtroCat" onchange="renderLista()">
+              <option value="">Todas categorias</option>
+            </select>
+            <select id="filtroTipo" onchange="renderLista()">
+              <option value="">Todos</option>
+              <option value="receita">Receitas</option>
+              <option value="despesa">Despesas</option>
+            </select>
+            <select id="filtroOrdem" onchange="renderLista()">
+              <option value="data_desc">Mais recentes</option>
+              <option value="data_asc">Mais antigos</option>
+              <option value="valor_desc">Maior valor</option>
+              <option value="valor_asc">Menor valor</option>
+            </select>
+          </div>
+          <div class="lista" id="listaItems"></div>
+        </div>
+
+        <!-- VIEW: GRÁFICOS -->
+        <div id="viewGraficos" style="display:none;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="chart-card">
+              <div class="sec-title">Despesas por categoria</div>
+              <div class="chart-wrap" style="height:200px;">
+                <canvas id="chartPizza" role="img" aria-label="Pizza de despesas por categoria"></canvas>
+              </div>
+              <div class="legend" id="legendaPizza"></div>
+            </div>
+            <div class="chart-card">
+              <div class="sec-title">Receitas vs Despesas — 6 meses</div>
+              <div class="chart-wrap" style="height:200px;">
+                <canvas id="chartBarras" role="img" aria-label="Barras comparando receitas e despesas por mês"></canvas>
+              </div>
+              <div class="legend">
+                <div class="legend-item"><div class="legend-dot" style="background:#5DCAA5"></div>Receitas</div>
+                <div class="legend-item"><div class="legend-dot" style="background:#F0997B"></div>Despesas</div>
+              </div>
+            </div>
+          </div>
+          <div class="chart-card" style="margin-top:14px;">
+            <div class="sec-title">Evolução do saldo — 6 meses</div>
+            <div class="chart-wrap" style="height:160px;">
+              <canvas id="chartLinha" role="img" aria-label="Linha do saldo por mês"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW: CATEGORIAS -->
+        <div id="viewCategorias" style="display:none;">
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+            <div class="chart-card">
+              <div class="sec-title" style="margin-bottom:14px;">Despesas por categoria</div>
+              <div class="cat-grid" id="catGridDespesa"></div>
+            </div>
+            <div class="chart-card">
+              <div class="sec-title" style="margin-bottom:14px;">Receitas por categoria</div>
+              <div class="cat-grid" id="catGridReceita"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
   </div>
-</header>
-
-<div class="layout">
-
-  <!-- SIDEBAR: FORMULÁRIO -->
-  <aside class="sidebar">
-    <div>
-      <div class="sec-title">Novo lançamento</div>
-      <div class="tipo-toggle">
-        <button class="tipo-btn despesa active" id="btnDespesa" onclick="setTipo('despesa')">
-          <i class="ti ti-minus"></i> Despesa
-        </button>
-        <button class="tipo-btn receita" id="btnReceita" onclick="setTipo('receita')">
-          <i class="ti ti-plus"></i> Receita
-        </button>
-      </div>
-      <div class="form-group">
-        <label>Descrição</label>
-        <input type="text" id="inputDesc" placeholder="Ex: Aluguel, Salário..." />
-      </div>
-      <div class="form-row two">
-        <div class="form-group">
-          <label>Valor (R$)</label>
-          <input type="number" id="inputValor" placeholder="0,00" min="0" step="0.01" />
-        </div>
-        <div class="form-group">
-          <label>Data</label>
-          <input type="date" id="inputData" />
-        </div>
-      </div>
-      <div class="form-group">
-        <label>Categoria</label>
-        <select id="inputCat"></select>
-      </div>
-      <div class="form-group">
-        <label>Forma de pagamento</label>
-        <select id="inputPag">
-          <option value="Dinheiro">💵 Dinheiro</option>
-          <option value="Débito">💳 Débito</option>
-          <option value="Crédito">💳 Crédito</option>
-          <option value="Pix">⚡ Pix</option>
-          <option value="Transferência">🏦 Transferência</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>Observação (opcional)</label>
-        <input type="text" id="inputObs" placeholder="Parcela 1/3, recorrente..." />
-      </div>
-      <button class="btn-add" onclick="adicionarLancamento()">
-        <i class="ti ti-plus"></i> Adicionar lançamento
-      </button>
-    </div>
-  </aside>
-
-  <!-- MAIN -->
-  <main class="main">
-
-    <!-- CARDS RESUMO -->
-    <div class="cards">
-      <div class="card receita">
-        <div class="label"><i class="ti ti-trending-up"></i> Receitas</div>
-        <div class="value" id="totalReceita">R$ 0,00</div>
-      </div>
-      <div class="card despesa">
-        <div class="label"><i class="ti ti-trending-down"></i> Despesas</div>
-        <div class="value" id="totalDespesa">R$ 0,00</div>
-      </div>
-      <div class="card saldo">
-        <div class="label"><i class="ti ti-scale"></i> Saldo</div>
-        <div class="value" id="totalSaldo" style="color:var(--text)">R$ 0,00</div>
-      </div>
-    </div>
-
-    <!-- BARRA ORÇAMENTO -->
-    <div class="orcamento-box" id="orcBox" style="display:none">
-      <div class="row">
-        <span style="color:var(--text2); font-size:13px">Comprometimento da renda</span>
-        <strong id="orcPct">0%</strong>
-      </div>
-      <div class="bar-wrap">
-        <div class="bar-fill" id="orcBar" style="width:0%"></div>
-      </div>
-    </div>
-
-    <!-- TABS -->
-    <div>
-      <div class="tabs" style="margin-bottom:14px;">
-        <button class="tab active" id="tabLancamentos" onclick="setTab('lancamentos')">
-          <i class="ti ti-list"></i> Lançamentos
-        </button>
-        <button class="tab" id="tabGraficos" onclick="setTab('graficos')">
-          <i class="ti ti-chart-pie"></i> Gráficos
-        </button>
-        <button class="tab" id="tabCategorias" onclick="setTab('categorias')">
-          <i class="ti ti-category"></i> Categorias
-        </button>
-      </div>
-
-      <!-- VIEW: LANÇAMENTOS -->
-      <div id="viewLancamentos">
-        <div class="filter-row" style="margin-bottom:12px;">
-          <select id="filtroCat" onchange="renderLista()">
-            <option value="">Todas categorias</option>
-          </select>
-          <select id="filtroTipo" onchange="renderLista()">
-            <option value="">Todos</option>
-            <option value="receita">Receitas</option>
-            <option value="despesa">Despesas</option>
-          </select>
-          <select id="filtroOrdem" onchange="renderLista()">
-            <option value="data_desc">Mais recentes</option>
-            <option value="data_asc">Mais antigos</option>
-            <option value="valor_desc">Maior valor</option>
-            <option value="valor_asc">Menor valor</option>
-          </select>
-        </div>
-        <div class="lista" id="listaItems"></div>
-      </div>
-
-      <!-- VIEW: GRÁFICOS -->
-      <div id="viewGraficos" style="display:none;">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-          <div class="chart-card">
-            <div class="sec-title">Despesas por categoria</div>
-            <div class="chart-wrap" style="height:200px;">
-              <canvas id="chartPizza" role="img" aria-label="Pizza de despesas por categoria"></canvas>
-            </div>
-            <div class="legend" id="legendaPizza"></div>
-          </div>
-          <div class="chart-card">
-            <div class="sec-title">Receitas vs Despesas — 6 meses</div>
-            <div class="chart-wrap" style="height:200px;">
-              <canvas id="chartBarras" role="img" aria-label="Barras comparando receitas e despesas por mês"></canvas>
-            </div>
-            <div class="legend">
-              <div class="legend-item"><div class="legend-dot" style="background:#5DCAA5"></div>Receitas</div>
-              <div class="legend-item"><div class="legend-dot" style="background:#F0997B"></div>Despesas</div>
-            </div>
-          </div>
-        </div>
-        <div class="chart-card" style="margin-top:14px;">
-          <div class="sec-title">Evolução do saldo — 6 meses</div>
-          <div class="chart-wrap" style="height:160px;">
-            <canvas id="chartLinha" role="img" aria-label="Linha do saldo por mês"></canvas>
-          </div>
-        </div>
-      </div>
-
-      <!-- VIEW: CATEGORIAS -->
-      <div id="viewCategorias" style="display:none;">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
-          <div class="chart-card">
-            <div class="sec-title" style="margin-bottom:14px;">Despesas por categoria</div>
-            <div class="cat-grid" id="catGridDespesa"></div>
-          </div>
-          <div class="chart-card">
-            <div class="sec-title" style="margin-bottom:14px;">Receitas por categoria</div>
-            <div class="cat-grid" id="catGridReceita"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </main>
 </div>
 
 <script>
+// Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDXlPcD0Z3BYjg4FZ65Uagj_HZkCPUUcXY",
+  authDomain: "controle-de-gastos-f176e.firebaseapp.com",
+  projectId: "controle-de-gastos-f176e",
+  storageBucket: "controle-de-gastos-f176e.firebasestorage.app",
+  messagingSenderId: "572120460120",
+  appId: "1:572120460120:web:dec11d9f25894e6c48132d"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+
+// Global Variables
 const CATS_DESPESA = ['Moradia','Alimentação','Transporte','Saúde','Lazer','Educação','Vestuário','Assinaturas','Outros'];
 const CATS_RECEITA = ['Salário','Freelance','Investimentos','Presente','Outros'];
 const CORES = {
@@ -328,18 +403,97 @@ const MESES_CURTO = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out'
 let tipoAtual = 'despesa';
 let mesOffset = 0;
 let chartPizzaI = null, chartBarrasI = null, chartLinhaI = null;
+let isRegistering = false;
+let currentUser = null;
+let lancamentos = [];
 
+// Auth Functions
+function toggleAuthMode() {
+  isRegistering = !isRegistering;
+  document.getElementById('authTitle').textContent = isRegistering ? 'Criar nova conta' : 'Faça login para continuar';
+  document.getElementById('authBtn').textContent = isRegistering ? 'Registrar' : 'Entrar';
+  document.getElementById('authError').style.display = 'none';
+}
+
+function handleAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const errorDiv = document.getElementById('authError');
+  const btn = document.getElementById('authBtn');
+
+  if (!email || !password) {
+    errorDiv.textContent = 'Preencha email e senha';
+    errorDiv.style.display = 'block';
+    return;
+  }
+
+  btn.classList.add('auth-loading');
+  btn.disabled = true;
+
+  if (isRegistering) {
+    auth.createUserWithEmailAndPassword(email, password)
+      .then(() => {
+        isRegistering = false;
+        toggleAuthMode();
+        errorDiv.textContent = 'Conta criada! Faça login agora.';
+        errorDiv.style.background = '#E1F5EE';
+        errorDiv.style.borderColor = '#1D9E75';
+        errorDiv.style.color = '#0F6E56';
+        errorDiv.style.display = 'block';
+        document.getElementById('authPassword').value = '';
+      })
+      .catch(err => {
+        errorDiv.textContent = 'Erro: ' + err.message;
+        errorDiv.style.display = 'block';
+      })
+      .finally(() => {
+        btn.classList.remove('auth-loading');
+        btn.disabled = false;
+      });
+  } else {
+    auth.signInWithEmailAndPassword(email, password)
+      .catch(err => {
+        errorDiv.textContent = 'Erro: ' + err.message;
+        errorDiv.style.display = 'block';
+        btn.classList.remove('auth-loading');
+        btn.disabled = false;
+      });
+  }
+}
+
+auth.onAuthStateChanged(user => {
+  if (user) {
+    currentUser = user;
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display = 'block';
+    document.getElementById('userEmail').textContent = user.email;
+    document.getElementById('userAvatar').textContent = user.email.charAt(0).toUpperCase();
+    document.getElementById('inputData').valueAsDate = new Date();
+    preencherFiltrosCat();
+    setTipo('despesa');
+    carregarLancamentos();
+  } else {
+    currentUser = null;
+    document.getElementById('authScreen').style.display = 'flex';
+    document.getElementById('appScreen').style.display = 'none';
+    document.getElementById('authEmail').value = '';
+    document.getElementById('authPassword').value = '';
+  }
+});
+
+function logout() {
+  auth.signOut();
+}
+
+// App Functions
 function fmtMoeda(v) {
   return 'R$ ' + Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
+
 function getMesAno(offset=0) {
   const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+offset);
   return { mes:d.getMonth(), ano:d.getFullYear(), key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` };
 }
-function getLancamentos() {
-  try { return JSON.parse(localStorage.getItem('gastos_v2')||'[]'); } catch { return []; }
-}
-function salvar(arr) { localStorage.setItem('gastos_v2', JSON.stringify(arr)); }
 
 function preencherFiltrosCat() {
   const allCats = [...CATS_DESPESA, ...CATS_RECEITA.filter(c=>c!=='Outros')];
@@ -357,33 +511,60 @@ function setTipo(t) {
 
 function mudarMes(d) { mesOffset+=d; atualizarTudo(); }
 
+function carregarLancamentos() {
+  if (!currentUser) return;
+  
+  db.collection('usuarios').doc(currentUser.uid).collection('lancamentos')
+    .orderBy('data', 'desc')
+    .onSnapshot(snapshot => {
+      lancamentos = [];
+      snapshot.forEach(doc => {
+        lancamentos.push({ id: doc.id, ...doc.data() });
+      });
+      atualizarTudo();
+    });
+}
+
 function adicionarLancamento() {
+  if (!currentUser) return;
+  
   const desc = document.getElementById('inputDesc').value.trim();
   const valor = parseFloat(document.getElementById('inputValor').value);
   const data = document.getElementById('inputData').value;
   const cat = document.getElementById('inputCat').value;
   const pag = document.getElementById('inputPag').value;
   const obs = document.getElementById('inputObs').value.trim();
-  if (!desc||isNaN(valor)||valor<=0||!data) { alert('Preencha descrição, valor e data.'); return; }
-  const arr = getLancamentos();
-  arr.unshift({id:Date.now(), desc, valor:parseFloat(valor.toFixed(2)), data, cat, pag, obs, tipo:tipoAtual});
-  salvar(arr);
-  document.getElementById('inputDesc').value='';
-  document.getElementById('inputValor').value='';
-  document.getElementById('inputObs').value='';
-  atualizarTudo();
+
+  if (!desc||isNaN(valor)||valor<=0||!data) { 
+    alert('Preencha descrição, valor e data.'); 
+    return; 
+  }
+
+  db.collection('usuarios').doc(currentUser.uid).collection('lancamentos').add({
+    desc,
+    valor: parseFloat(valor.toFixed(2)),
+    data,
+    cat,
+    pag,
+    obs,
+    tipo: tipoAtual,
+    timestamp: new Date()
+  }).then(() => {
+    document.getElementById('inputDesc').value='';
+    document.getElementById('inputValor').value='';
+    document.getElementById('inputObs').value='';
+  }).catch(err => alert('Erro ao salvar: ' + err.message));
 }
 
 function remover(id) {
-  if (!confirm('Remover este lançamento?')) return;
-  salvar(getLancamentos().filter(l=>l.id!==id));
-  atualizarTudo();
+  if (!currentUser || !confirm('Remover este lançamento?')) return;
+  db.collection('usuarios').doc(currentUser.uid).collection('lancamentos').doc(id).delete();
 }
 
 function atualizarTudo() {
   const {mes,ano,key} = getMesAno(mesOffset);
   document.getElementById('mesAtual').textContent = MESES[mes]+' '+ano;
-  const items = getLancamentos().filter(l=>l.data&&l.data.startsWith(key));
+  const items = lancamentos.filter(l=>l.data&&l.data.startsWith(key));
   const rec = items.filter(l=>l.tipo==='receita').reduce((s,l)=>s+l.valor,0);
   const des = items.filter(l=>l.tipo==='despesa').reduce((s,l)=>s+l.valor,0);
   const sal = rec-des;
@@ -411,7 +592,7 @@ function renderLista() {
   const filCat=document.getElementById('filtroCat').value;
   const filTipo=document.getElementById('filtroTipo').value;
   const filOrdem=document.getElementById('filtroOrdem').value;
-  let items=getLancamentos().filter(l=>l.data&&l.data.startsWith(key));
+  let items=lancamentos.filter(l=>l.data&&l.data.startsWith(key));
   if(filCat) items=items.filter(l=>l.cat===filCat);
   if(filTipo) items=items.filter(l=>l.tipo===filTipo);
   if(filOrdem==='data_asc') items.sort((a,b)=>a.data.localeCompare(b.data));
@@ -428,7 +609,7 @@ function renderLista() {
         <div class="sub">${l.cat} · ${l.pag} · ${l.data.split('-').reverse().join('/')}${l.obs?' · '+l.obs:''}</div>
       </div>
       <div class="item-val ${l.tipo==='receita'?'rec':'des'}">${l.tipo==='receita'?'+':'-'} ${fmtMoeda(l.valor)}</div>
-      <button class="item-del" onclick="remover(${l.id})" title="Remover"><i class="ti ti-trash"></i></button>
+      <button class="item-del" onclick="remover('${l.id}')" title="Remover"><i class="ti ti-trash"></i></button>
     </div>
   `).join('');
 }
@@ -444,8 +625,7 @@ function setTab(t) {
 
 function renderGraficos() {
   const {key}=getMesAno(mesOffset);
-  const todos=getLancamentos();
-  const desMes=todos.filter(l=>l.data&&l.data.startsWith(key)&&l.tipo==='despesa');
+  const desMes=lancamentos.filter(l=>l.data&&l.data.startsWith(key)&&l.tipo==='despesa');
   const porCat={};
   desMes.forEach(l=>{porCat[l.cat]=(porCat[l.cat]||0)+l.valor;});
   const labPizza=Object.keys(porCat);
@@ -467,8 +647,8 @@ function renderGraficos() {
   }
   const meses6=Array.from({length:6},(_,i)=>getMesAno(mesOffset-5+i));
   const labM=meses6.map(m=>MESES_CURTO[m.mes]);
-  const recM=meses6.map(m=>parseFloat(todos.filter(l=>l.tipo==='receita'&&l.data&&l.data.startsWith(m.key)).reduce((s,l)=>s+l.valor,0).toFixed(2)));
-  const desM=meses6.map(m=>parseFloat(todos.filter(l=>l.tipo==='despesa'&&l.data&&l.data.startsWith(m.key)).reduce((s,l)=>s+l.valor,0).toFixed(2)));
+  const recM=meses6.map(m=>parseFloat(lancamentos.filter(l=>l.tipo==='receita'&&l.data&&l.data.startsWith(m.key)).reduce((s,l)=>s+l.valor,0).toFixed(2)));
+  const desM=meses6.map(m=>parseFloat(lancamentos.filter(l=>l.tipo==='despesa'&&l.data&&l.data.startsWith(m.key)).reduce((s,l)=>s+l.valor,0).toFixed(2)));
   const salM=recM.map((r,i)=>parseFloat((r-desM[i]).toFixed(2)));
   if(chartBarrasI) chartBarrasI.destroy();
   chartBarrasI=new Chart(document.getElementById('chartBarras'),{
@@ -494,7 +674,7 @@ function renderGraficos() {
 
 function renderCategorias() {
   const {key}=getMesAno(mesOffset);
-  const items=getLancamentos().filter(l=>l.data&&l.data.startsWith(key));
+  const items=lancamentos.filter(l=>l.data&&l.data.startsWith(key));
   function buildCatGrid(tipo,elId){
     const cats=tipo==='despesa'?CATS_DESPESA:CATS_RECEITA;
     const por={};
@@ -514,11 +694,6 @@ function renderCategorias() {
   buildCatGrid('despesa','catGridDespesa');
   buildCatGrid('receita','catGridReceita');
 }
-
-document.getElementById('inputData').valueAsDate=new Date();
-preencherFiltrosCat();
-setTipo('despesa');
-atualizarTudo();
 </script>
 </body>
 </html>
