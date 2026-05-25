@@ -1,3 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Controle de Gastos</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.19.0/dist/tabler-icons.min.css" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-app.js";
+  import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDXlPcD0Z3BYjg4FZ65Uagj_HZkCPUUcXY",
+    authDomain: "controle-de-gastos-f176e.firebaseapp.com",
+    projectId: "controle-de-gastos-f176e",
+    storageBucket: "controle-de-gastos-f176e.firebasestorage.app",
+    messagingSenderId: "572120460120",
+    appId: "1:572120460120:web:dec11d9f25894e6c48132d"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  window.auth = auth;
+  window.db = db;
+  window.createUserWithEmailAndPassword = createUserWithEmailAndPassword;
+  window.signInWithEmailAndPassword = signInWithEmailAndPassword;
+  window.signOut = signOut;
+  window.onAuthStateChanged = onAuthStateChanged;
+  window.collection = collection;
+  window.addDoc = addDoc;
+  window.deleteDoc = deleteDoc;
+  window.doc = doc;
+  window.onSnapshot = onSnapshot;
+  window.query = query;
+  window.orderBy = orderBy;
+  window.serverTimestamp = serverTimestamp;
+</script>
+
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  
+  body {
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    background: #0a0e27;
+    color: #ffffff;
+    overflow-x: hidden;
+  }
+
+  /* ===== AUTH SCREEN ===== */
+  .auth-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .auth-container::before {
+    content: '';
+    position: absolute;
+    width: 400px;
+    height: 400px;
+    background: radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, transparent 70%);
+    border-radius: 50%;
+    top: -100px;
+    right: -100px;
+  }
+
+  .auth-box {
+    background: linear-gradient(135deg, #1a1f3a 0%, #0f1629 100%);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 20px;
+    padding: 3rem;
+    max-width: 420px;
+    width: 100%;
+    position: relative;
+    z-index: 1;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  }
+
+  .auth-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+  }
+
+  .auth-header i {
+    font-size: 56px;
+    color: #ef4444;
+    display: block;
+    margin-bottom: 1.5rem;
+    text-shadow: 0 0 30px rgba(239, 68, 68, 0.3);
+  }
+
+  .auth-header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+    background: linear-gradient(135deg, #ef4444, #fca5a5);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .auth-header p {
+    color: #9ca3af;
+    font-size: 14px;
+  }
+
+  .auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .auth-input {
+    height: 48px;
+    padding: 0 16px;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    color: #ffffff;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.3s;
+    backdrop-filter: blur(10px);
+  }
+
+  .auth-input:focus {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+  }
+
+  .auth-btn {
+    height: 48px;
+    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    font-size: 15px;
+    color: #fff;
+    font-weight: 600;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .auth-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(239, 68, 68, 0.4);
+  }
+
+  .auth-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .auth-error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid #ef4444;
+    color: #fca5a5;
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 13px;
+    display: none;
+  }
+
+  .auth-toggle {
+    text-align: center;
+    margin-top: 1.5rem;
+    font-size: 13px;
+    color: #9ca3af;
+  }
+
+  .auth-toggle a {
+    color: #ef4444;
+    cursor: pointer;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  /* ===== APP LAYOUT ===== */
+  .app-container {
+    display: none;
+    height: 100vh;
+    flex-direction: column;
+  }
+
+  .topbar {
+    background: linear-gradient(90deg, #0a0e27 0%, #1a1f3a 100%);
+    border-bottom: 1px solid rgba(239, 68, 68, 0.1);
+    padding: 1.2rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    backdrop-filter: blur(10px);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+
+  .topbar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-size: 20px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+
+  .topbar-brand i {
+    font-size: 28px;
+    color: #ef4444;
+  }
+
+  .topbar-center {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(239, 68, 68, 0.05);
+    padding: 0.6rem 1.2rem;
+    border-radius: 10px;
+    border: 1px solid rgba(239, 68, 68, 0.1);
+  }
+
+  .topbar-center button {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0.4rem 0.8rem;
+    transition: all 0.3s;
+  }
+
+  .topbar-center button:hover {
+    color: #ef4444;
+  }
+
+  .topbar-center span {
+    font-size: 14px;
+    font-weight: 600;
+    min-width: 120px;
+    text-align: center;
+  }
+
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
   .user-badge {
     display: flex;
     align-items: center;
@@ -6,6 +265,12 @@
     padding: 0.6rem 1.2rem;
     border-radius: 10px;
     border: 1px solid rgba(239, 68, 68, 0.2);
+    cursor: pointer;
+    transition: all 0.3s;
+  }
+
+  .user-badge:hover {
+    background: rgba(239, 68, 68, 0.2);
   }
 
   .user-avatar {
@@ -35,6 +300,219 @@
     color: #d1d5db;
   }
 
+  .btn-logout {
+    padding: 0.6rem 1.4rem;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid #ef4444;
+    border-radius: 10px;
+    color: #ef4444;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.3s;
+  }
+
+  .btn-logout:hover {
+    background: #ef4444;
+    color: #ffffff;
+  }
+
+  /* ===== MAIN LAYOUT ===== */
+  .main-layout {
+    display: grid;
+    grid-template-columns: 1fr 380px;
+    gap: 1.5rem;
+    padding: 2rem;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  .main-content {
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+  }
+
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.2rem;
+  }
+
+  .stat-card {
+    background: linear-gradient(135deg, #1a1f3a 0%, #0f1629 100%);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 16px;
+    padding: 1.5rem;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    background: radial-gradient(circle, rgba(239, 68, 68, 0.1) 0%, transparent 70%);
+    border-radius: 50%;
+    top: -50px;
+    right: -50px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: #9ca3af;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.8rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .stat-label i {
+    font-size: 16px;
+  }
+
+  .stat-value {
+    font-size: 32px;
+    font-weight: 700;
+  }
+
+  .stat-card.receita .stat-value {
+    color: #10b981;
+  }
+
+  .stat-card.despesa .stat-value {
+    color: #ef4444;
+  }
+
+  .stat-card.saldo .stat-value {
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* ===== TABS ===== */
+  .tabs-container {
+    display: flex;
+    gap: 0.8rem;
+    margin-bottom: 1.5rem;
+    background: rgba(239, 68, 68, 0.05);
+    padding: 0.6rem;
+    border-radius: 12px;
+    border: 1px solid rgba(239, 68, 68, 0.1);
+    width: fit-content;
+  }
+
+  .tab {
+    padding: 0.7rem 1.2rem;
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 600;
+    border-radius: 8px;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .tab:hover {
+    color: #ef4444;
+  }
+
+  .tab.active {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: #ffffff;
+  }
+
+  /* ===== CONTENT VIEW ===== */
+  .content-view {
+    background: linear-gradient(135deg, #1a1f3a 0%, #0f1629 100%);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: none;
+  }
+
+  .content-view.active {
+    display: block;
+    animation: fadeIn 0.3s ease-in;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ===== FORM ===== */
+  .sidebar-form {
+    background: linear-gradient(135deg, #1a1f3a 0%, #0f1629 100%);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 16px;
+    padding: 1.5rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1.2rem;
+  }
+
+  .form-title {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #ef4444;
+  }
+
+  .tipo-toggle {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.8rem;
+  }
+
+  .tipo-btn {
+    height: 44px;
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    background: rgba(239, 68, 68, 0.05);
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #9ca3af;
+    font-weight: 600;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .tipo-btn:hover {
+    border-color: #ef4444;
+    color: #ef4444;
+  }
+
+  .tipo-btn.active {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border-color: #ef4444;
+    color: #ffffff;
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .form-group label {
+    font-size: 12px;
+    color: #9ca3af;
+    font-weight: 600;
+  }
+
+  .form-group input,
   .form-group select {
     height: 42px;
     padding: 0 12px;
@@ -46,6 +524,9 @@
     font-family: inherit;
     outline: none;
     transition: all 0.3s;
+  }
+
+  .form-group select {
     appearance: none;
     background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
     background-repeat: no-repeat;
@@ -58,3 +539,572 @@
     background: #1a1f3a;
     color: #ffffff;
   }
+
+  .form-group input:focus,
+  .form-group select:focus {
+    border-color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  .btn-add {
+    height: 44px;
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 13px;
+    color: #ffffff;
+    font-weight: 600;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .btn-add:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(239, 68, 68, 0.3);
+  }
+
+  /* ===== LISTA ===== */
+  .lista {
+    display: flex;
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+
+  .item {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.1);
+    border-radius: 12px;
+    padding: 1.2rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.3s;
+  }
+
+  .item:hover {
+    border-color: rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.05);
+  }
+
+  .item-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .item-info {
+    flex: 1;
+  }
+
+  .item-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .item-sub {
+    font-size: 12px;
+    color: #9ca3af;
+    margin-top: 4px;
+  }
+
+  .item-value {
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .item-value.rec {
+    color: #10b981;
+  }
+
+  .item-value.des {
+    color: #ef4444;
+  }
+
+  .btn-del {
+    background: none;
+    border: none;
+    color: #9ca3af;
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0.4rem;
+    border-radius: 6px;
+    transition: all 0.3s;
+  }
+
+  .btn-del:hover {
+    color: #ef4444;
+    background: rgba(239, 68, 68, 0.1);
+  }
+
+  .empty {
+    text-align: center;
+    padding: 2rem;
+    color: #9ca3af;
+  }
+
+  .empty i {
+    font-size: 48px;
+    opacity: 0.3;
+    display: block;
+    margin-bottom: 1rem;
+  }
+
+  /* ===== CHARTS ===== */
+  .chart-wrapper {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.1);
+    border-radius: 12px;
+    padding: 1.2rem;
+    height: 280px;
+  }
+
+  /* ===== FILTERS ===== */
+  .filter-row {
+    display: flex;
+    gap: 0.8rem;
+    flex-wrap: wrap;
+    margin-bottom: 1.2rem;
+  }
+
+  .filter-row select {
+    padding: 0.6rem 1rem;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    border-radius: 8px;
+    color: #9ca3af;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.3s;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 16px;
+    padding-right: 28px;
+  }
+
+  .filter-row select option {
+    background: #1a1f3a;
+    color: #ffffff;
+  }
+
+  .filter-row select:hover,
+  .filter-row select:focus {
+    border-color: #ef4444;
+    color: #ffffff;
+  }
+
+  /* ===== MOBILE ===== */
+  @media (max-width: 1024px) {
+    .main-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (max-width: 640px) {
+    .stats-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .topbar {
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .topbar-right {
+      width: 100%;
+    }
+  }
+</style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div id="authScreen" class="auth-container">
+  <div class="auth-box">
+    <div class="auth-header">
+      <i class="ti ti-wallet"></i>
+      <h1>FinanceFlow</h1>
+      <p id="authTitle">Controle seus gastos inteligentemente</p>
+    </div>
+    <div id="authError" class="auth-error"></div>
+    <div class="auth-form">
+      <input type="email" id="authEmail" class="auth-input" placeholder="Seu email" />
+      <input type="password" id="authPassword" class="auth-input" placeholder="Senha (mín. 6 caracteres)" />
+      <button id="authBtn" class="auth-btn" onclick="handleAuth()">Entrar</button>
+    </div>
+    <div class="auth-toggle">
+      Não tem conta? <a onclick="toggleAuthMode()">Criar conta</a>
+    </div>
+  </div>
+</div>
+
+<!-- APP SCREEN -->
+<div id="appScreen" class="app-container">
+  <header class="topbar">
+    <div class="topbar-brand">
+      <i class="ti ti-wallet"></i>
+      FinanceFlow
+    </div>
+    <div class="topbar-center">
+      <button onclick="mudarMes(-1)"><i class="ti ti-chevron-left"></i></button>
+      <span id="mesAtual"></span>
+      <button onclick="mudarMes(1)"><i class="ti ti-chevron-right"></i></button>
+    </div>
+    <div class="topbar-right">
+      <div class="user-badge">
+        <div class="user-avatar" id="userAvatar">U</div>
+        <div>
+          <div style="font-size: 11px; color: #9ca3af;">USUÁRIO</div>
+          <div class="user-email" id="userEmail">email@example.com</div>
+        </div>
+      </div>
+      <button class="btn-logout" onclick="handleLogout()">Sair</button>
+    </div>
+  </header>
+
+  <div class="main-layout">
+    <div class="main-content">
+      <!-- STATS -->
+      <div class="stats-grid">
+        <div class="stat-card receita">
+          <div class="stat-label"><i class="ti ti-trending-up"></i> Receitas</div>
+          <div class="stat-value" id="totalReceita">R$ 0,00</div>
+        </div>
+        <div class="stat-card despesa">
+          <div class="stat-label"><i class="ti ti-trending-down"></i> Despesas</div>
+          <div class="stat-value" id="totalDespesa">R$ 0,00</div>
+        </div>
+        <div class="stat-card saldo">
+          <div class="stat-label"><i class="ti ti-scale"></i> Saldo</div>
+          <div class="stat-value" id="totalSaldo">R$ 0,00</div>
+        </div>
+      </div>
+
+      <!-- TABS -->
+      <div class="tabs-container">
+        <button class="tab active" id="tabLancamentos" onclick="setTab('lancamentos')">
+          <i class="ti ti-list"></i> Lançamentos
+        </button>
+        <button class="tab" id="tabGraficos" onclick="setTab('graficos')">
+          <i class="ti ti-chart-pie"></i> Gráficos
+        </button>
+      </div>
+
+      <!-- LANÇAMENTOS VIEW -->
+      <div id="viewLancamentos" class="content-view active">
+        <div class="filter-row">
+          <select id="filtroCat" onchange="renderLista()">
+            <option value="">Todas categorias</option>
+          </select>
+          <select id="filtroTipo" onchange="renderLista()">
+            <option value="">Todos</option>
+            <option value="receita">Receitas</option>
+            <option value="despesa">Despesas</option>
+          </select>
+          <select id="filtroOrdem" onchange="renderLista()">
+            <option value="data_desc">Mais recentes</option>
+            <option value="data_asc">Mais antigos</option>
+            <option value="valor_desc">Maior valor</option>
+            <option value="valor_asc">Menor valor</option>
+          </select>
+        </div>
+        <div class="lista" id="listaItems"></div>
+      </div>
+
+      <!-- GRÁFICOS VIEW -->
+      <div id="viewGraficos" class="content-view">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; margin-bottom: 1.2rem;">
+          <div class="chart-wrapper">
+            <canvas id="chartPizza"></canvas>
+          </div>
+          <div class="chart-wrapper">
+            <canvas id="chartBarras"></canvas>
+          </div>
+        </div>
+        <div class="chart-wrapper" style="height: 250px;">
+          <canvas id="chartLinha"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIDEBAR -->
+    <div class="sidebar-form">
+      <div class="form-title">+ Adicionar</div>
+      <div class="tipo-toggle">
+        <button class="tipo-btn despesa active" id="btnDespesa" onclick="setTipo('despesa')">
+          <i class="ti ti-minus"></i> Despesa
+        </button>
+        <button class="tipo-btn receita" id="btnReceita" onclick="setTipo('receita')">
+          <i class="ti ti-plus"></i> Receita
+        </button>
+      </div>
+
+      <div class="form-group">
+        <label>Descrição</label>
+        <input type="text" id="inputDesc" placeholder="Ex: Aluguel" />
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem;">
+        <div class="form-group">
+          <label>Valor</label>
+          <input type="number" id="inputValor" placeholder="0,00" min="0" step="0.01" />
+        </div>
+        <div class="form-group">
+          <label>Data</label>
+          <input type="date" id="inputData" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Categoria</label>
+        <select id="inputCat"></select>
+      </div>
+
+      <div class="form-group">
+        <label>Pagamento</label>
+        <select id="inputPag">
+          <option value="Dinheiro">💵 Dinheiro</option>
+          <option value="Débito">💳 Débito</option>
+          <option value="Crédito">💳 Crédito</option>
+          <option value="Pix">⚡ Pix</option>
+          <option value="Transferência">🏦 Transferência</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label>Observação</label>
+        <input type="text" id="inputObs" placeholder="Opcional" />
+      </div>
+
+      <button class="btn-add" onclick="adicionarLancamento()">
+        <i class="ti ti-check"></i> Confirmar
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+const CATS_DESPESA = ['Moradia','Alimentação','Transporte','Saúde','Lazer','Educação','Vestuário','Assinaturas','Outros'];
+const CATS_RECEITA = ['Salário','Freelance','Investimentos','Presente','Outros'];
+const CORES = {'Moradia':'#ef4444','Alimentação':'#10b981','Transporte':'#f59e0b','Saúde':'#8b5cf6','Lazer':'#ec4899','Educação':'#3b82f6','Vestuário':'#06b6d4','Assinaturas':'#6b7280','Salário':'#10b981','Freelance':'#f59e0b','Investimentos':'#3b82f6','Presente':'#ec4899','Outros':'#9ca3af'};
+const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+const MESES_CURTO = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+let tipoAtual = 'despesa';
+let mesOffset = 0;
+let chartPizzaI = null, chartBarrasI = null, chartLinhaI = null;
+let isRegistering = false;
+let currentUser = null;
+let lancamentos = [];
+
+setTimeout(() => {
+  if (!window.auth) return;
+  window.onAuthStateChanged(window.auth, user => {
+    if (user) {
+      currentUser = user;
+      document.getElementById('authScreen').style.display = 'none';
+      document.getElementById('appScreen').style.display = 'flex';
+      document.getElementById('userEmail').textContent = user.email;
+      document.getElementById('userAvatar').textContent = user.email.charAt(0).toUpperCase();
+      document.getElementById('inputData').valueAsDate = new Date();
+      preencherFiltrosCat();
+      setTipo('despesa');
+      carregarLancamentos();
+    } else {
+      currentUser = null;
+      document.getElementById('authScreen').style.display = 'flex';
+      document.getElementById('appScreen').style.display = 'none';
+    }
+  });
+}, 1000);
+
+function toggleAuthMode() {
+  isRegistering = !isRegistering;
+  document.getElementById('authTitle').textContent = isRegistering ? 'Crie sua conta' : 'Controle seus gastos inteligentemente';
+  document.getElementById('authBtn').textContent = isRegistering ? 'Registrar' : 'Entrar';
+}
+
+function handleAuth() {
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const errorDiv = document.getElementById('authError');
+  const btn = document.getElementById('authBtn');
+
+  errorDiv.style.display = 'none';
+
+  if (!email || !password) {
+    errorDiv.textContent = 'Preencha todos os campos';
+    errorDiv.style.display = 'block';
+    return;
+  }
+
+  if (password.length < 6) {
+    errorDiv.textContent = 'Senha deve ter no mínimo 6 caracteres';
+    errorDiv.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = isRegistering ? 'Registrando...' : 'Entrando...';
+
+  if (isRegistering) {
+    window.createUserWithEmailAndPassword(window.auth, email, password)
+      .then(() => {
+        isRegistering = false;
+        document.getElementById('authTitle').textContent = 'Controle seus gastos inteligentemente';
+        document.getElementById('authBtn').textContent = 'Entrar';
+        document.getElementById('authPassword').value = '';
+        btn.disabled = false;
+      })
+      .catch(err => {
+        errorDiv.textContent = 'Erro: ' + err.message;
+        errorDiv.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Registrar';
+      });
+  } else {
+    window.signInWithEmailAndPassword(window.auth, email, password)
+      .catch(err => {
+        errorDiv.textContent = 'Erro: ' + err.message;
+        errorDiv.style.display = 'block';
+        btn.disabled = false;
+        btn.textContent = 'Entrar';
+      });
+  }
+}
+
+function handleLogout() { window.signOut(window.auth); }
+
+function fmtMoeda(v) { return 'R$ ' + Math.abs(v).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+
+function getMesAno(offset=0) {
+  const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()+offset);
+  return { mes:d.getMonth(), ano:d.getFullYear(), key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}` };
+}
+
+function preencherFiltrosCat() {
+  const allCats = [...CATS_DESPESA, ...CATS_RECEITA.filter(c=>c!=='Outros')];
+  const el = document.getElementById('filtroCat');
+  el.innerHTML = '<option value="">Todas categorias</option>' + allCats.map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+
+function setTipo(t) {
+  tipoAtual = t;
+  document.getElementById('btnDespesa').className = 'tipo-btn despesa'+(t==='despesa'?' active':'');
+  document.getElementById('btnReceita').className = 'tipo-btn receita'+(t==='receita'?' active':'');
+  const cats = t==='receita' ? CATS_RECEITA : CATS_DESPESA;
+  document.getElementById('inputCat').innerHTML = cats.map(c=>`<option>${c}</option>`).join('');
+}
+
+function mudarMes(d) { mesOffset+=d; atualizarTudo(); }
+
+function carregarLancamentos() {
+  if (!currentUser || !window.db) return;
+  const q = window.query(window.collection(window.db, 'usuarios', currentUser.uid, 'lancamentos'), window.orderBy('timestamp', 'desc'));
+  window.onSnapshot(q, snapshot => {
+    lancamentos = [];
+    snapshot.forEach(doc => { lancamentos.push({ id: doc.id, ...doc.data() }); });
+    atualizarTudo();
+  });
+}
+
+function adicionarLancamento() {
+  if (!currentUser || !window.db) return;
+  const desc = document.getElementById('inputDesc').value.trim();
+  const valor = parseFloat(document.getElementById('inputValor').value);
+  const data = document.getElementById('inputData').value;
+  const cat = document.getElementById('inputCat').value;
+  const pag = document.getElementById('inputPag').value;
+  const obs = document.getElementById('inputObs').value.trim();
+
+  if (!desc||isNaN(valor)||valor<=0||!data) { alert('Preencha todos os campos'); return; }
+
+  window.addDoc(window.collection(window.db, 'usuarios', currentUser.uid, 'lancamentos'), {
+    desc, valor: parseFloat(valor.toFixed(2)), data, cat, pag, obs, tipo: tipoAtual,
+    timestamp: window.serverTimestamp()
+  }).then(() => {
+    document.getElementById('inputDesc').value='';
+    document.getElementById('inputValor').value='';
+    document.getElementById('inputObs').value='';
+  }).catch(err => alert('Erro: ' + err.message));
+}
+
+function remover(id) {
+  if (!currentUser || !window.db || !confirm('Remover?')) return;
+  window.deleteDoc(window.doc(window.db, 'usuarios', currentUser.uid, 'lancamentos', id));
+}
+
+function atualizarTudo() {
+  const {mes,ano,key} = getMesAno(mesOffset);
+  document.getElementById('mesAtual').textContent = MESES[mes]+' '+ano;
+  const items = lancamentos.filter(l=>l.data&&l.data.startsWith(key));
+  const rec = items.filter(l=>l.tipo==='receita').reduce((s,l)=>s+l.valor,0);
+  const des = items.filter(l=>l.tipo==='despesa').reduce((s,l)=>s+l.valor,0);
+  const sal = rec-des;
+  document.getElementById('totalReceita').textContent = fmtMoeda(rec);
+  document.getElementById('totalDespesa').textContent = fmtMoeda(des);
+  document.getElementById('totalSaldo').textContent = fmtMoeda(sal);
+  renderLista();
+  const tab = document.querySelector('.tab.active')?.id;
+  if (tab==='tabGraficos') renderGraficos();
+}
+
+function renderLista() {
+  const {key}=getMesAno(mesOffset);
+  let items=lancamentos.filter(l=>l.data&&l.data.startsWith(key));
+  const filCat=document.getElementById('filtroCat').value;
+  const filTipo=document.getElementById('filtroTipo').value;
+  const filOrdem=document.getElementById('filtroOrdem').value;
+  if(filCat) items=items.filter(l=>l.cat===filCat);
+  if(filTipo) items=items.filter(l=>l.tipo===filTipo);
+  if(filOrdem==='data_asc') items.sort((a,b)=>a.data.localeCompare(b.data));
+  else if(filOrdem==='data_desc') items.sort((a,b)=>b.data.localeCompare(a.data));
+  else if(filOrdem==='valor_desc') items.sort((a,b)=>b.valor-a.valor);
+  else if(filOrdem==='valor_asc') items.sort((a,b)=>a.valor-b.valor);
+  const el=document.getElementById('listaItems');
+  if(!items.length){el.innerHTML='<div class="empty"><i class="ti ti-inbox"></i>Nenhum lançamento</div>';return;}
+  el.innerHTML=items.map(l=>`<div class="item"><div class="item-dot" style="background:${CORES[l.cat]||'#888'}"></div><div class="item-info"><div class="item-name">${l.desc}</div><div class="item-sub">${l.cat} • ${l.pag} • ${l.data.split('-').reverse().join('/')}</div></div><div class="item-value ${l.tipo==='receita'?'rec':'des'}">${l.tipo==='receita'?'+':'-'} ${fmtMoeda(l.valor)}</div><button class="btn-del" onclick="remover('${l.id}')"><i class="ti ti-trash"></i></button></div>`).join('');
+}
+
+function setTab(t) {
+  document.querySelectorAll('.tab').forEach(x=>{x.className='tab'+(x.id==='tab'+t.charAt(0).toUpperCase()+t.slice(1)?' active':'');});
+  document.querySelectorAll('.content-view').forEach(x=>{x.className='content-view'+(x.id==='view'+t.charAt(0).toUpperCase()+t.slice(1)?' active':'');});
+  if(t==='graficos') renderGraficos();
+}
+
+function renderGraficos() {
+  const {key}=getMesAno(mesOffset);
+  const desMes=lancamentos.filter(l=>l.data&&l.data.startsWith(key)&&l.tipo==='despesa');
+  const porCat={};
+  desMes.forEach(l=>{porCat[l.cat]=(porCat[l.cat]||0)+l.valor;});
+  const labPizza=Object.keys(porCat);
+  const valPizza=labPizza.map(c=>porCat[c]);
+  const coresPizza=labPizza.map(c=>CORES[c]||'#888');
+  if(chartPizzaI) chartPizzaI.destroy();
+  if(labPizza.length){
+    chartPizzaI=new Chart(document.getElementById('chartPizza'),{type:'doughnut',data:{labels:labPizza,datasets:[{data:valPizza,backgroundColor:coresPizza,borderColor:'#0f1629',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},cutout:'65%'}});
+  }
+  const meses6=Array.from({length:6},(_,i)=>getMesAno(mesOffset-5+i));
+  const labM=meses6.map(m=>MESES_CURTO[m.mes]);
+  const recM=meses6.map(m=>lancamentos.filter(l=>l.tipo==='receita'&&l.data&&l.data.startsWith(m.key)).reduce((s,l)=>s+l.valor,0));
+  const desM=meses6.map(m=>lancamentos.filter(l=>l.tipo==='despesa'&&l.data&&l.data.startsWith(m.key)).reduce((s,l)=>s+l.valor,0));
+  if(chartBarrasI) chartBarrasI.destroy();
+  chartBarrasI=new Chart(document.getElementById('chartBarras'),{type:'bar',data:{labels:labM,datasets:[{label:'Receitas',data:recM,backgroundColor:'#10b981',borderRadius:8},{label:'Despesas',data:desM,backgroundColor:'#ef4444',borderRadius:8}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#9ca3af'}},y:{grid:{color:'rgba(239,68,68,0.1)'},ticks:{color:'#9ca3af',callback:v=>'R$'+v.toLocaleString('pt-BR')}}}}}); 
+  if(chartLinhaI) chartLinhaI.destroy();
+  const salM=recM.map((r,i)=>r-desM[i]);
+  chartLinhaI=new Chart(document.getElementById('chartLinha'),{type:'line',data:{labels:labM,datasets:[{label:'Saldo',data:salM,borderColor:'#8b5cf6',backgroundColor:'rgba(139,92,246,0.1)',fill:true,tension:0.4,pointBackgroundColor:'#8b5cf6',pointRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{color:'#9ca3af'}},y:{grid:{color:'rgba(239,68,68,0.1)'},ticks:{color:'#9ca3af',callback:v=>'R$'+v.toLocaleString('pt-BR')}}}}});
+}
+</script>
+</body>
+</html>
